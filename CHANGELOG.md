@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-08-17
+
+- Fix durable persistence on DSH rc.6 by using a plugin-owned same-origin Host route.
+- Store metadata atomically in `~/.dsh/workspace-labels.json` with mode `0600`.
+- Preserve the browser fallback until Host persistence is acknowledged.
+
 ## 0.6.1 — 2026-08-17
 
 - Replace the sidebar filter bar and modal editors with a compact white editor inside each existing three-dot menu.
