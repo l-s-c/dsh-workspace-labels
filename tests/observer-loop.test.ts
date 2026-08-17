@@ -1,9 +1,7 @@
 import { JSDOM } from 'jsdom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountDecorations, titleText } from '../src/decorations.js'
-import { mountFilterUi } from '../src/filter-ui.js'
 import { EMPTY_DOCUMENT, type LabelsDocument } from '../src/state.js'
-import type { LabelsStore } from '../src/store.js'
 
 function fixture(): JSDOM {
   return new JSDOM(`<!doctype html><html lang="zh-CN"><body>
@@ -16,23 +14,6 @@ function fixture(): JSDOM {
       </div>
     </div>
   </body></html>`, { pretendToBeVisual: true })
-}
-
-function memoryStore(initial: LabelsDocument): LabelsStore {
-  let snapshot = initial
-  const listeners = new Set<() => void>()
-  return {
-    getSnapshot: () => snapshot,
-    subscribe(listener) {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    writable: () => true,
-    async patch(next) {
-      snapshot = { ...snapshot, ...next }
-      for (const listener of listeners) listener()
-    },
-  }
 }
 
 async function settle(dom: JSDOM, turns = 20): Promise<void> {
@@ -97,31 +78,10 @@ describe('mutation observer re-entrancy', () => {
     await settle(dom)
     const title = dom.window.document.querySelector('.hash_projectText')
     expect(title).not.toBeNull()
-    expect(title?.textContent).toContain('重点')
+    expect(title?.textContent).toBe('测试项目')
+    expect(title?.nextElementSibling?.classList.contains('dsh-workspace-labels-badges')).toBe(true)
+    expect(title?.nextElementSibling?.textContent).toContain('重点')
     expect(titleText(title as Element)).toBe('测试项目')
   })
 
-  it('filter bar settles instead of re-triggering its own observer', async () => {
-    const dom = fixture()
-    stubDomGlobals(dom)
-    const store = memoryStore({
-      ...EMPTY_DOCUMENT,
-      views: [{ id: 'v1', name: '视图', labelIds: [], query: '', target: 'all' }],
-    })
-    const entities = vi.fn(() => [
-      { id: 'w1', title: '测试项目', target: 'workspace' as const },
-      { id: 's1', title: '测试会话', target: 'session' as const },
-    ])
-    dispose = mountFilterUi({
-      document: dom.window.document,
-      store,
-      entities,
-      labels: { placeholder: '筛选', saveView: '保存视图', viewName: '视图名称', all: '全部' },
-    })
-    await settle(dom)
-    expect(dom.window.document.querySelector('.dsh-workspace-labels-filter')).not.toBeNull()
-    const settled = entities.mock.calls.length
-    await settle(dom)
-    expect(entities.mock.calls.length).toBe(settled)
-  })
 })

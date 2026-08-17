@@ -73,10 +73,10 @@ function decorate(row: HTMLElement, entity: RowEntity, titleElement: HTMLElement
     row.style.setProperty('--dsh-workspace-label-tint', rgba(color, 0.1))
     row.classList.add('dsh-workspace-labels-colored')
   }
-  const existing = titleElement.querySelector<HTMLElement>(`.${BADGE_CLASS}`)
-  const shown = labels.slice(0, 3)
+  const existing = Array.from(row.children).find((child): child is HTMLElement => child instanceof HTMLElement && child.classList.contains(BADGE_CLASS))
+  const shown = labels.slice(0, 2)
   const signature = shown.map((label) => `${label.name}\u0000${label.color}`).join('\u0001')
-  if (existing !== null && existing.dataset.signature === signature && existing.dataset.entityId === entity.id) return
+  if (existing !== undefined && existing.dataset.signature === signature && existing.dataset.entityId === entity.id) return
   existing?.remove()
   if (shown.length === 0) return
   const badges = row.ownerDocument.createElement('span')
@@ -91,14 +91,17 @@ function decorate(row: HTMLElement, entity: RowEntity, titleElement: HTMLElement
     badge.style.color = label.color
     badges.appendChild(badge)
   }
-  titleElement.appendChild(badges)
+  titleElement.insertAdjacentElement('afterend', badges)
 }
 
 function styleText(): string {
   return `
 .dsh-workspace-labels-colored { box-shadow: inset 3px 0 0 var(--dsh-workspace-label-color); background: var(--dsh-workspace-label-tint) !important; }
-.dsh-workspace-labels-badges { display:inline-flex; gap:3px; margin-left:5px; vertical-align:middle; max-width:48%; overflow:hidden; }
-.dsh-workspace-labels-badge { display:inline-block; border:1px solid; border-radius:999px; padding:0 5px; font-size:9px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:72px; }
+.dsh-workspace-labels-badges { display:inline-flex; flex:none; align-items:center; gap:3px; min-width:0; max-width:42%; overflow:hidden; margin-left:0; }
+.dsh-workspace-labels-badge { display:block; flex:0 1 auto; min-width:0; border:1px solid; border-radius:999px; padding:0 5px; font-size:9px; line-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60px; }
+[role="treeitem"] > [class*="projectText"], [role="treeitem"] > [class*="title"] { min-width:0; }
+[role="treeitem"] > [class*="projectText"] + .dsh-workspace-labels-badges, [role="treeitem"] > [class*="title"] + .dsh-workspace-labels-badges { order:initial; }
+.dsh-workspace-labels-badges + [class*="time"] { margin-left:auto; }
 `
 }
 

@@ -1,4 +1,5 @@
 import { titleText } from './decorations.js'
+import type { InlineCopy } from './menu-inline.js'
 
 export const PLUGIN_ID = 'dsh-workspace-labels'
 export const OPEN_ACTION = 'workspace-labels-open'
@@ -39,10 +40,8 @@ export interface EnhanceOptions {
   logger: EnhancerLogger
   label?: string
   copyLabel?: string
-  colorLabel?: string
-  labelsLabel?: string
-  onCycleColor?: (workspace: WorkspaceRecord) => void | Promise<void>
-  onManageLabels?: (workspace: WorkspaceRecord) => void | Promise<void>
+  inline?: (menu: HTMLElement, workspace: WorkspaceRecord) => void
+  inlineCopy?: InlineCopy
   canOpen?: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
 }
 
@@ -184,8 +183,6 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
   const { document, workspaces, opener, logger } = options
   const label = options.label ?? '打开工作区'
   const copyLabel = options.copyLabel ?? '复制工作区路径'
-  const colorLabel = options.colorLabel ?? '切换工作区颜色'
-  const labelsLabel = options.labelsLabel ?? '管理工作区标签'
   const canOpen = options.canOpen ?? { getSnapshot: () => true, subscribe: () => () => {} }
   let disposed = false
   let scheduled = false
@@ -195,7 +192,7 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
     if (disposed) return
     const active = activeWorkspaceMenu(document)
     if (active === undefined || active.menu.querySelector(`[${MENU_MARKER}]`) !== null) return
-    if (!canOpen.getSnapshot() && options.clipboard === undefined && options.onCycleColor === undefined && options.onManageLabels === undefined) return
+    if (!canOpen.getSnapshot() && options.clipboard === undefined && options.inline === undefined) return
 
     const workspace = resolveWorkspace(active.row, workspaces.getSnapshot().items)
     if (workspace === undefined) {
@@ -227,19 +224,8 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
         closeMenu()
       }))
     }
-    if (options.onCycleColor !== undefined) {
-      entries.push(makeMenuItem(document, active.menu, COLOR_ACTION, colorLabel, folderIcon(document), () => {
-        void options.onCycleColor?.(workspace)
-        closeMenu()
-      }))
-    }
-    if (options.onManageLabels !== undefined) {
-      entries.push(makeMenuItem(document, active.menu, LABEL_ACTION, labelsLabel, copyIcon(document), () => {
-        void options.onManageLabels?.(workspace)
-        closeMenu()
-      }))
-    }
     viewport.prepend(...entries)
+    options.inline?.(active.menu, workspace)
   }
 
   const schedule = (): void => {

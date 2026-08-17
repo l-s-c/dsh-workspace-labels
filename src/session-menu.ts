@@ -1,15 +1,11 @@
-import type { LabelsStore } from './store.js'
 import { titleText } from './decorations.js'
 
 export interface SessionEntity { id: string; title: string }
 
 export interface SessionMenuOptions {
   document: Document
-  store: LabelsStore
   sessions(): readonly SessionEntity[]
-  labels: { color: string; manage: string }
-  onEditColor(session: SessionEntity): void
-  onEditLabels(session: SessionEntity): void
+  inline(menu: HTMLElement, session: SessionEntity): void
 }
 
 function classContains(element: Element, value: string): boolean {
@@ -19,26 +15,6 @@ function classContains(element: Element, value: string): boolean {
 function titleOf(row: HTMLElement): string {
   const title = Array.from(row.children).find((child): child is HTMLElement => child instanceof HTMLElement && classContains(child, 'title'))
   return title === undefined ? '' : titleText(title)
-}
-
-function menuItem(document: Document, menu: HTMLElement, action: string, label: string, select: () => void): HTMLElement {
-  const reference = menu.querySelector<HTMLElement>('[role="menuitem"]')
-  const wrapper = document.createElement(reference?.parentElement?.tagName.toLowerCase() ?? 'div')
-  if (reference?.parentElement instanceof HTMLElement) wrapper.className = reference.parentElement.className
-  wrapper.dataset.dshWorkspaceLabelsSessionMenu = 'true'
-  const button = document.createElement('button')
-  button.type = 'button'; button.role = 'menuitem'; button.dataset.action = action
-  if (reference !== null) button.className = reference.className
-  const icon = document.createElement('span')
-  if (reference?.children[0] instanceof HTMLElement) icon.className = reference.children[0].className
-  icon.textContent = action.endsWith('color') ? '●' : '🏷'
-  const text = document.createElement('span')
-  if (reference?.children[1] instanceof HTMLElement) text.className = reference.children[1].className
-  text.textContent = label
-  button.append(icon, text)
-  button.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); select() })
-  wrapper.appendChild(button)
-  return wrapper
 }
 
 export function mountSessionMenu(options: SessionMenuOptions): () => void {
@@ -51,30 +27,19 @@ export function mountSessionMenu(options: SessionMenuOptions): () => void {
     const row = Array.from(document.querySelectorAll<HTMLElement>('[role="treeitem"]')).find((candidate) =>
       classContains(candidate, 'sessionRow') && classContains(candidate, 'menuOpen'))
     if (row === undefined) return
-    const title = titleOf(row)
-    const matches = options.sessions().filter((session) => session.title === title)
+    const matches = options.sessions().filter((session) => session.title === titleOf(row))
     if (matches.length !== 1) return
-    const session = matches[0]
     const button = row.querySelector<HTMLButtonElement>('button[aria-label]')
     if (button === null) return
     const rect = button.getBoundingClientRect()
-    const menus = Array.from(document.querySelectorAll<HTMLElement>('[role="menu"]')).filter((menu) => menu.querySelector('[role="menuitem"]') !== null)
-    const menu = menus.sort((a, b) => {
-      const ar = a.getBoundingClientRect(); const br = b.getBoundingClientRect()
-      return Math.abs(ar.left - rect.left) + Math.abs(ar.top - rect.bottom) - Math.abs(br.left - rect.left) - Math.abs(br.top - rect.bottom)
-    })[0]
-    if (menu === undefined || menu.querySelector('[data-dsh-workspace-labels-session-menu]') !== null) return
-    const viewport = menu.querySelector<HTMLElement>('[role="presentation"]') ?? menu
-    const close = (): void => { document.dispatchEvent(new (document.defaultView?.MouseEvent ?? MouseEvent)('pointerdown', { bubbles: true })) }
-    const color = menuItem(document, menu, 'workspace-labels-session-color', options.labels.color, () => {
-      close()
-      options.onEditColor(session)
-    })
-    const labels = menuItem(document, menu, 'workspace-labels-session-labels', options.labels.manage, () => {
-      close()
-      options.onEditLabels(session)
-    })
-    viewport.prepend(color, labels)
+    const menu = Array.from(document.querySelectorAll<HTMLElement>('[role="menu"]'))
+      .filter((candidate) => candidate.querySelector('[role="menuitem"]') !== null)
+      .sort((a, b) => {
+        const ar = a.getBoundingClientRect(); const br = b.getBoundingClientRect()
+        return Math.abs(ar.left - rect.left) + Math.abs(ar.top - rect.bottom) - Math.abs(br.left - rect.left) - Math.abs(br.top - rect.bottom)
+      })[0]
+    if (menu === undefined || menu.querySelector('[data-dsh-workspace-labels-inline]') !== null) return
+    options.inline(menu, matches[0])
   }
   const schedule = (): void => { if (!disposed && !pending) { pending = true; queueMicrotask(sync) } }
   const Observer = document.defaultView?.MutationObserver
@@ -84,6 +49,6 @@ export function mountSessionMenu(options: SessionMenuOptions): () => void {
   document.addEventListener('click', schedule, true)
   return () => {
     disposed = true; observer.disconnect(); document.removeEventListener('click', schedule, true)
-    document.querySelectorAll('[data-dsh-workspace-labels-session-menu]').forEach((entry) => entry.remove())
+    document.querySelectorAll('[data-dsh-workspace-labels-inline]').forEach((entry) => entry.remove())
   }
 }

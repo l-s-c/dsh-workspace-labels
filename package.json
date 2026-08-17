@@ -1,7 +1,7 @@
 {
   "name": "dsh-workspace-labels",
-  "version": "0.6.0",
-  "description": "Organize DeepSeek Harness workspaces and sessions with menu actions, colors, labels, filters, and saved views.",
+  "version": "0.6.1",
+  "description": "Organize DeepSeek Harness workspaces and sessions with inline menu colors and labels.",
   "author": "l-s-c",
   "repository": {
     "type": "git",

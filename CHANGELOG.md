@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 — 2026-08-17
+
+- Replace the sidebar filter bar and modal editors with a compact white editor inside each existing three-dot menu.
+- Select colors directly and manage labels without leaving the menu.
+- Place label badges between the row title and time/actions.
+- Persist metadata to `~/.dsh/settings.yaml` and migrate browser-local metadata only after Host acknowledgement.
+
 ## 0.6.0 — 2026-08-17
 
 - Add session colors and text labels to the existing session menu.
