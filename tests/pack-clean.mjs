@@ -13,12 +13,12 @@ try {
   await cp(join(root, 'pnpm-lock.yaml'), join(clone, 'pnpm-lock.yaml'), { force: true })
   execFileSync('pnpm', ['install', '--frozen-lockfile'], { cwd: clone, stdio: 'inherit' })
   execFileSync('pnpm', ['pack', '--pack-destination', temp], { cwd: clone, stdio: 'inherit' })
-  const tarball = join(temp, 'dsh-workspace-labels-0.1.0.tgz')
+  const manifest = JSON.parse(await readFile(join(clone, 'package.json'), 'utf8'))
+  const tarball = join(temp, `dsh-workspace-labels-${manifest.version}.tgz`)
   const listing = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' }).split('\n')
   for (const required of ['package/lib/index.js', 'package/lib/client.js', 'package/cordis.patch.yml']) {
     if (!listing.includes(required)) throw new Error(`clean pack omitted ${required}`)
   }
-  const manifest = JSON.parse(await readFile(join(clone, 'package.json'), 'utf8'))
   if (manifest.dsh?.bundle?.patch !== './cordis.patch.yml') throw new Error('clean pack lost dsh.bundle manifest')
   console.log('Clean checkout pack contains executable DSH artifacts')
 } finally {

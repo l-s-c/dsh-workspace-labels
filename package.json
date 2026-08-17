@@ -1,7 +1,7 @@
 {
   "name": "dsh-workspace-labels",
-  "version": "0.1.0",
-  "description": "Open DeepSeek Harness workspaces from the existing sidebar three-dot menu.",
+  "version": "0.6.0",
+  "description": "Organize DeepSeek Harness workspaces and sessions with menu actions, colors, labels, filters, and saved views.",
   "author": "l-s-c",
   "repository": {
     "type": "git",

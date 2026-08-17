@@ -4,7 +4,9 @@ import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { IWorkspaces, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { mountDecorations, nextColor } from './decorations.js'
+import { mountFilterUi } from './filter-ui.js'
 import { enhanceOpenWorkspaceMenu } from './menu-enhancer.js'
+import { mountSessionMenu } from './session-menu.js'
 import { decodeDocument, EMPTY_DOCUMENT, type LabelsDocument } from './state.js'
 import { createLabelsStore } from './store.js'
 
@@ -23,10 +25,10 @@ export const inject = ['workspaces', 'sessions', 'connection', 'locale', 'settin
 
 export function apply(ctx: ClientContext): void {
   const unregisterLocale = ctx.locale.register(LOCALE_NS, 'zh', {
-    openWorkspace: '打开工作区', copyWorkspacePath: '复制工作区路径', cycleColor: '切换工作区颜色', manageLabels: '管理工作区标签', promptLabels: '输入标签，使用英文逗号分隔',
+    openWorkspace: '打开工作区', copyWorkspacePath: '复制工作区路径', cycleColor: '切换工作区颜色', manageLabels: '管理工作区标签', promptLabels: '输入标签，使用英文逗号分隔', filterPlaceholder: '筛选：文字或 #标签', saveView: '保存视图', viewName: '视图名称', allViews: '全部', sessionColor: '切换会话颜色', sessionLabels: '管理会话标签',
   })
   const unregisterEnglish = ctx.locale.register(LOCALE_NS, 'en', {
-    openWorkspace: 'Open workspace', copyWorkspacePath: 'Copy workspace path', cycleColor: 'Cycle workspace color', manageLabels: 'Manage workspace labels', promptLabels: 'Enter labels separated by commas',
+    openWorkspace: 'Open workspace', copyWorkspacePath: 'Copy workspace path', cycleColor: 'Cycle workspace color', manageLabels: 'Manage workspace labels', promptLabels: 'Enter labels separated by commas', filterPlaceholder: 'Filter: text or #label', saveView: 'Save view', viewName: 'View name', allViews: 'All', sessionColor: 'Cycle session color', sessionLabels: 'Manage session labels',
   })
   const t = ctx.locale.bind(LOCALE_NS)
   const scope = ctx.settingsScope.bind<LabelsDocument>({ namespace: 'workspace-labels', decode: decodeDocument }) as SettingsScope<LabelsDocument>
@@ -41,6 +43,21 @@ export function apply(ctx: ClientContext): void {
       subscribe: store.subscribe,
       workspaces: workspaceEntities,
       sessions: sessionEntities,
+    })
+    const disposeFilter = mountFilterUi({
+      document,
+      store,
+      entities: () => [
+        ...workspaceEntities().map((item) => ({ ...item, target: 'workspace' as const })),
+        ...sessionEntities().map((item) => ({ ...item, target: 'session' as const })),
+      ],
+      labels: { placeholder: t('filterPlaceholder'), saveView: t('saveView'), viewName: t('viewName'), all: t('allViews') },
+    })
+    const disposeSessionMenu = mountSessionMenu({
+      document,
+      store,
+      sessions: sessionEntities,
+      labels: { color: t('sessionColor'), manage: t('sessionLabels'), prompt: t('promptLabels') },
     })
 
     const mount = (): (() => void) => enhanceOpenWorkspaceMenu({
@@ -86,7 +103,7 @@ export function apply(ctx: ClientContext): void {
     let disposeEnhancer = mount()
     const unsubscribeLocale = ctx.locale.subscribe(() => { disposeEnhancer(); disposeEnhancer = mount() })
     return () => {
-      unsubscribeLocale(); disposeEnhancer(); disposeDecorations(); unregisterEnglish(); unregisterLocale()
+      unsubscribeLocale(); disposeEnhancer(); disposeSessionMenu(); disposeFilter(); disposeDecorations(); unregisterEnglish(); unregisterLocale()
     }
   }, 'workspace-labels: workspace and session organization')
 }
