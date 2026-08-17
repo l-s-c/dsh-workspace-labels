@@ -21,4 +21,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
-      - run: pnpm pack --pack-destination dist
+      - run: mkdir -p dist && pnpm pack --pack-destination dist
+      - run: tar -tzf dist/*.tgz | grep -E 'package/lib/(index|client)\.js'

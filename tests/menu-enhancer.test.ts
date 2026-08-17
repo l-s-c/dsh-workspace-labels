@@ -54,6 +54,53 @@ describe('enhanceOpenWorkspaceMenu', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
+  it('copies the canonical workspace path when the copy action is selected', async () => {
+    const dom = fixture()
+    vi.stubGlobal('HTMLElement', dom.window.HTMLElement)
+    const write = vi.fn(async () => true)
+    const source = {
+      getSnapshot: () => ({ items: [{ workspaceId: 'w1', title: '测试项目', path: '/tmp/project' }] }),
+      subscribe: () => () => {},
+    }
+
+    dispose = enhanceOpenWorkspaceMenu({
+      document: dom.window.document,
+      workspaces: source,
+      opener: { openPath: async () => {} },
+      clipboard: { write },
+      logger: { warn: () => {} },
+    })
+    await flush()
+
+    const action = dom.window.document.querySelector<HTMLButtonElement>('[data-action="workspace-labels-copy-path"]')
+    expect(action?.textContent).toContain('复制工作区路径')
+    action?.click()
+    await flush()
+    expect(write).toHaveBeenCalledWith('/tmp/project')
+  })
+
+  it('hides open when the host cannot open paths but keeps copy available', async () => {
+    const dom = fixture()
+    vi.stubGlobal('HTMLElement', dom.window.HTMLElement)
+    const source = {
+      getSnapshot: () => ({ items: [{ workspaceId: 'w1', title: '测试项目', path: '/tmp/project' }] }),
+      subscribe: () => () => {},
+    }
+
+    dispose = enhanceOpenWorkspaceMenu({
+      document: dom.window.document,
+      workspaces: source,
+      opener: { openPath: async () => {} },
+      clipboard: { write: async () => true },
+      canOpen: { getSnapshot: () => false, subscribe: () => () => {} },
+      logger: { warn: () => {} },
+    })
+    await flush()
+
+    expect(dom.window.document.querySelector('[data-action="workspace-labels-open"]')).toBeNull()
+    expect(dom.window.document.querySelector('[data-action="workspace-labels-copy-path"]')).not.toBeNull()
+  })
+
   it('does not guess when workspace titles are duplicated', async () => {
     const dom = fixture()
     vi.stubGlobal('MutationObserver', dom.window.MutationObserver)

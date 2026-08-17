@@ -18,7 +18,7 @@ DeepSeek Harness Web 左侧工作区增强插件。首个功能是在工作区�
 dsh plugin --profile web add dsh-workspace-labels@0.1.0
 ```
 
-重启当前 `dsh web` 进程并刷新页面。不要额外启动第二个 Web 实例，否则会与现有的 `127.0.0.1:3080` 端口冲突。
+重启当前 `dsh web` 进程并刷新页面。不要额外启动第二个 Web 实例，以免与当前服务监听地址冲突。
 
 ## 使用
 

@@ -33,7 +33,9 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime"
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale"
       ],
       "immediately": true
     }
@@ -42,7 +44,9 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "test:pack": "node tests/pack-clean.mjs",
+    "prepack": "pnpm run check"
   },
   "keywords": [
     "deepseek-harness",
@@ -56,6 +60,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
     "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^22.0.0",
@@ -65,7 +71,7 @@
     "vitest": "^3.2.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "publishConfig": {
     "access": "public"

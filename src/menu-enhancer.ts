@@ -1,5 +1,6 @@
 export const PLUGIN_ID = 'dsh-workspace-labels'
 export const OPEN_ACTION = 'workspace-labels-open'
+export const COPY_ACTION = 'workspace-labels-copy-path'
 export const MENU_MARKER = 'data-dsh-workspace-labels-menu'
 export const ROW_MARKER = 'data-dsh-workspace-labels-workspace-id'
 
@@ -18,6 +19,10 @@ export interface WorkspaceOpener {
   openPath(path: string): Promise<void>
 }
 
+export interface ClipboardWriter {
+  write(text: string): Promise<boolean>
+}
+
 export interface EnhancerLogger {
   warn(message: string): void
 }
@@ -26,8 +31,11 @@ export interface EnhanceOptions {
   document: Document
   workspaces: WorkspaceSource
   opener: WorkspaceOpener
+  clipboard?: ClipboardWriter
   logger: EnhancerLogger
   label?: string
+  copyLabel?: string
+  canOpen?: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
 }
 
 function directChildByClassPart(row: Element, part: string): HTMLElement | undefined {
@@ -99,6 +107,22 @@ function activeWorkspaceMenu(document: Document): { row: HTMLElement; menu: HTML
   return menu === undefined ? undefined : { row, menu }
 }
 
+function copyIcon(document: Document): SVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('width', '16')
+  svg.setAttribute('height', '16')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('aria-hidden', 'true')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', 'M5.25 5.25h6.5v6.5h-6.5v-6.5Zm-1 4.5h-1a1 1 0 0 1-1-1v-5.5a1 1 0 0 1 1-1h5.5a1 1 0 0 1 1 1v1')
+  path.setAttribute('stroke', 'currentColor')
+  path.setAttribute('stroke-width', '1.25')
+  path.setAttribute('stroke-linejoin', 'round')
+  svg.appendChild(path)
+  return svg
+}
+
 function folderIcon(document: Document): SVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('width', '16')
@@ -115,8 +139,8 @@ function folderIcon(document: Document): SVGElement {
   return svg
 }
 
-function makeMenuItem(document: Document, label: string, onSelect: () => void): HTMLElement {
-  const reference = document.querySelector<HTMLElement>('[role="menuitem"]')
+function makeMenuItem(document: Document, menu: HTMLElement, action: string, label: string, iconNode: SVGElement, onSelect: () => void): HTMLElement {
+  const reference = menu.querySelector<HTMLElement>('[role="menuitem"]')
   const wrapperReference = reference?.parentElement
   const wrapper = document.createElement(wrapperReference?.tagName.toLowerCase() ?? 'div')
   if (wrapperReference?.className !== undefined) wrapper.className = wrapperReference.className
@@ -125,13 +149,13 @@ function makeMenuItem(document: Document, label: string, onSelect: () => void): 
   const button = document.createElement('button')
   button.type = 'button'
   button.setAttribute('role', 'menuitem')
-  button.setAttribute('data-action', OPEN_ACTION)
+  button.setAttribute('data-action', action)
   if (reference?.className !== undefined) button.className = reference.className
 
   const iconReference = reference?.children.item(0)
   const icon = document.createElement('span')
   if (iconReference instanceof HTMLElement) icon.className = iconReference.className
-  icon.appendChild(folderIcon(document))
+  icon.appendChild(iconNode)
 
   const labelReference = reference?.children.item(1)
   const text = document.createElement('span')
@@ -151,6 +175,8 @@ function makeMenuItem(document: Document, label: string, onSelect: () => void): 
 export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
   const { document, workspaces, opener, logger } = options
   const label = options.label ?? '打开工作区'
+  const copyLabel = options.copyLabel ?? '复制工作区路径'
+  const canOpen = options.canOpen ?? { getSnapshot: () => true, subscribe: () => () => {} }
   let disposed = false
   let scheduled = false
 
@@ -159,6 +185,7 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
     if (disposed) return
     const active = activeWorkspaceMenu(document)
     if (active === undefined || active.menu.querySelector(`[${MENU_MARKER}]`) !== null) return
+    if (!canOpen.getSnapshot() && options.clipboard === undefined) return
 
     const workspace = resolveWorkspace(active.row, workspaces.getSnapshot().items)
     if (workspace === undefined) {
@@ -167,14 +194,30 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
     }
 
     const viewport = active.menu.querySelector<HTMLElement>('[role="presentation"]') ?? active.menu
-    const entry = makeMenuItem(document, label, () => {
-      void opener.openPath(workspace.path).catch((error: unknown) => {
-        logger.warn(`${PLUGIN_ID}: openPath rejected for workspace ${workspace.workspaceId}: ${String(error)}`)
-      })
+    const closeMenu = (): void => {
       const PointerEventCtor = document.defaultView?.PointerEvent ?? document.defaultView?.MouseEvent
       if (PointerEventCtor !== undefined) document.dispatchEvent(new PointerEventCtor('pointerdown', { bubbles: true }))
-    })
-    viewport.prepend(entry)
+    }
+    const entries: HTMLElement[] = []
+    if (canOpen.getSnapshot()) {
+      entries.push(makeMenuItem(document, active.menu, OPEN_ACTION, label, folderIcon(document), () => {
+        void opener.openPath(workspace.path).catch((error: unknown) => {
+          logger.warn(`${PLUGIN_ID}: openPath rejected for workspace ${workspace.workspaceId}: ${String(error)}`)
+        })
+        closeMenu()
+      }))
+    }
+    if (options.clipboard !== undefined) {
+      entries.push(makeMenuItem(document, active.menu, COPY_ACTION, copyLabel, copyIcon(document), () => {
+        void options.clipboard?.write(workspace.path).then((copied) => {
+          if (!copied) logger.warn(`${PLUGIN_ID}: clipboard write was rejected for workspace ${workspace.workspaceId}`)
+        }).catch((error: unknown) => {
+          logger.warn(`${PLUGIN_ID}: clipboard write failed for workspace ${workspace.workspaceId}: ${String(error)}`)
+        })
+        closeMenu()
+      }))
+    }
+    viewport.prepend(...entries)
   }
 
   const schedule = (): void => {
@@ -188,6 +231,7 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
   const observer = new MutationObserverCtor(schedule)
   observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] })
   const unsubscribe = workspaces.subscribe(schedule)
+  const unsubscribeCapability = canOpen.subscribe(schedule)
   document.addEventListener('click', schedule, true)
   schedule()
 
@@ -195,6 +239,7 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
     disposed = true
     observer.disconnect()
     unsubscribe()
+    unsubscribeCapability()
     document.removeEventListener('click', schedule, true)
     document.querySelectorAll(`[${MENU_MARKER}]`).forEach((entry) => entry.remove())
     document.querySelectorAll(`[${ROW_MARKER}]`).forEach((row) => row.removeAttribute(ROW_MARKER))
