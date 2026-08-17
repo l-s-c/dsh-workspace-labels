@@ -1,0 +1,4 @@
+# dsh-workspace-labels bundle patch.
+- insert:
+    - id: workspace-labels
+      name: dsh-workspace-labels
