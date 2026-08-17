@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.3 — 2026-08-17
+
+- Serialize Host writes and use unique, cleaned-up temporary files.
+- Use atomic field patches to avoid unrelated cross-client update loss.
+- Prevent startup races and retain browser recovery data until the latest write is acknowledged.
+- Harden the persistence route with same-origin checks, stable errors, media-type validation, and strict document versions.
+- Avoid stale session-menu bindings when popup DOM is reused and remove obsolete package dependencies/exports.
+- Expand persistence, concurrency, validation, and permissions regression coverage.
+
 ## 0.6.2 — 2026-08-17
 
 - Fix durable persistence on DSH rc.6 by using a plugin-owned same-origin Host route.

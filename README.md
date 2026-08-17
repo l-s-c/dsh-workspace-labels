@@ -20,7 +20,7 @@
 
 ```sh
 dsh plugin --profile web add \
-  https://github.com/l-s-c/dsh-workspace-labels/releases/download/v0.6.2/dsh-workspace-labels-0.6.2.tgz
+  https://github.com/l-s-c/dsh-workspace-labels/releases/download/v0.6.3/dsh-workspace-labels-0.6.3.tgz
 ```
 
 重启当前 `dsh web` 进程并刷新页面。不要额外启动第二个 Web 实例，以免监听地址冲突。

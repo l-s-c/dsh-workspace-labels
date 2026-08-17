@@ -8,6 +8,11 @@ describe('metadata state', () => {
     expect(nextColor(COLOR_PALETTE.at(-1))).toBeUndefined()
   })
 
+  it('rejects documents without a supported version', () => {
+    expect(decodeDocument({})).toBeUndefined()
+    expect(decodeDocument({ ...EMPTY_DOCUMENT, version: 2 })).toBeUndefined()
+  })
+
   it('normalizes labels, assignments and views', () => {
     const result = decodeDocument({
       ...EMPTY_DOCUMENT,

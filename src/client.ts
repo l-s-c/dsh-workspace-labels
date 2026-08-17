@@ -28,7 +28,7 @@ export function apply(ctx: ClientContext): void {
     openWorkspace: 'Open workspace', copyWorkspacePath: 'Copy workspace path', color: 'Color', labels: 'Labels', addLabel: 'Add label', labelPlaceholder: 'New label name', clear: 'Clear', delete: 'Delete label',
   })
   const t = ctx.locale.bind(LOCALE_NS)
-  const store = createHttpLabelsStore(window.localStorage)
+  const store = createHttpLabelsStore({ storage: window.localStorage, onError: (message) => ctx.logger.warn(`workspace-labels: persistence: ${message}`) })
   const copy = (): InlineCopy => ({ color: t('color'), labels: t('labels'), addLabel: t('addLabel'), labelPlaceholder: t('labelPlaceholder'), clear: t('clear'), delete: t('delete') })
 
   ctx.effect(() => {
@@ -63,7 +63,11 @@ export function apply(ctx: ClientContext): void {
       opener: { openPath: (path) => ctx.workspaces.openPath(path) },
       clipboard: { write: async (text) => { try { await navigator.clipboard.writeText(text); return true } catch { return false } } },
       canOpen: { getSnapshot: () => ctx.connection.isLoopback && ctx.connection.hostDescription.getSnapshot()?.canOpenPath === true, subscribe: (listener) => ctx.connection.hostDescription.subscribe(listener) },
-      inline: (menu, workspace) => inline(menu, 'workspace', workspace.workspaceId),
+      inline: (menu, workspace) => {
+        inline(menu, 'workspace', workspace.workspaceId)
+        const mounted = menu.querySelector<HTMLElement>('[data-dsh-workspace-labels-inline]')
+        if (mounted !== null) { mounted.dataset.entityId = workspace.workspaceId; mounted.dataset.entityType = 'workspace' }
+      },
       logger: ctx.logger, label: t('openWorkspace'), copyLabel: t('copyWorkspacePath'),
     })
     let disposeEnhancer = mount()

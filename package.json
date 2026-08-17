@@ -1,6 +1,6 @@
 {
   "name": "dsh-workspace-labels",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Organize DeepSeek Harness workspaces and sessions with inline menu colors and labels.",
   "author": "l-s-c",
   "repository": {
@@ -35,8 +35,7 @@
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-settings"
+        "@deepseek-ai/dsh-client-locale"
       ],
       "immediately": true
     }
@@ -57,18 +56,13 @@
     "sidebar"
   ],
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-settings": ">=0.1.0-rc.6 <0.2.0-0",
-    "@deepseek-ai/schemastery": "^3.18.1"
+    "@deepseek-ai/cordis": "^4.0.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6",
     "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
     "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-settings": "0.1.0-rc.6",
-    "@deepseek-ai/schemastery": "^3.18.1",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^22.0.0",
     "esbuild": "^0.25.0",

@@ -61,6 +61,7 @@ function arrayRecord(value: unknown): Record<string, string[]> {
 export function decodeDocument(value: unknown): LabelsDocument | undefined {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
   const raw = value as Record<string, unknown>
+  if (raw.version !== 1) return undefined
   const labels = Array.isArray(raw.labels) ? raw.labels.flatMap((item) => {
     if (item === null || typeof item !== 'object' || Array.isArray(item)) return []
     const label = item as Record<string, unknown>
