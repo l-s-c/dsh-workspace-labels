@@ -1,6 +1,8 @@
 export const PLUGIN_ID = 'dsh-workspace-labels'
 export const OPEN_ACTION = 'workspace-labels-open'
 export const COPY_ACTION = 'workspace-labels-copy-path'
+export const COLOR_ACTION = 'workspace-labels-color'
+export const LABEL_ACTION = 'workspace-labels-manage-labels'
 export const MENU_MARKER = 'data-dsh-workspace-labels-menu'
 export const ROW_MARKER = 'data-dsh-workspace-labels-workspace-id'
 
@@ -35,6 +37,10 @@ export interface EnhanceOptions {
   logger: EnhancerLogger
   label?: string
   copyLabel?: string
+  colorLabel?: string
+  labelsLabel?: string
+  onCycleColor?: (workspace: WorkspaceRecord) => void | Promise<void>
+  onManageLabels?: (workspace: WorkspaceRecord) => void | Promise<void>
   canOpen?: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
 }
 
@@ -176,6 +182,8 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
   const { document, workspaces, opener, logger } = options
   const label = options.label ?? '打开工作区'
   const copyLabel = options.copyLabel ?? '复制工作区路径'
+  const colorLabel = options.colorLabel ?? '切换工作区颜色'
+  const labelsLabel = options.labelsLabel ?? '管理工作区标签'
   const canOpen = options.canOpen ?? { getSnapshot: () => true, subscribe: () => () => {} }
   let disposed = false
   let scheduled = false
@@ -185,7 +193,7 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
     if (disposed) return
     const active = activeWorkspaceMenu(document)
     if (active === undefined || active.menu.querySelector(`[${MENU_MARKER}]`) !== null) return
-    if (!canOpen.getSnapshot() && options.clipboard === undefined) return
+    if (!canOpen.getSnapshot() && options.clipboard === undefined && options.onCycleColor === undefined && options.onManageLabels === undefined) return
 
     const workspace = resolveWorkspace(active.row, workspaces.getSnapshot().items)
     if (workspace === undefined) {
@@ -214,6 +222,18 @@ export function enhanceOpenWorkspaceMenu(options: EnhanceOptions): () => void {
         }).catch((error: unknown) => {
           logger.warn(`${PLUGIN_ID}: clipboard write failed for workspace ${workspace.workspaceId}: ${String(error)}`)
         })
+        closeMenu()
+      }))
+    }
+    if (options.onCycleColor !== undefined) {
+      entries.push(makeMenuItem(document, active.menu, COLOR_ACTION, colorLabel, folderIcon(document), () => {
+        void options.onCycleColor?.(workspace)
+        closeMenu()
+      }))
+    }
+    if (options.onManageLabels !== undefined) {
+      entries.push(makeMenuItem(document, active.menu, LABEL_ACTION, labelsLabel, copyIcon(document), () => {
+        void options.onManageLabels?.(workspace)
         closeMenu()
       }))
     }
