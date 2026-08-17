@@ -5,7 +5,7 @@
 - Replace the sidebar filter bar and modal editors with a compact white editor inside each existing three-dot menu.
 - Select colors directly and manage labels without leaving the menu.
 - Place label badges between the row title and time/actions.
-- Persist metadata to `~/.dsh/settings.yaml` and migrate browser-local metadata only after Host acknowledgement.
+- Persist metadata to `~/.dsh/workspace-labels.json` through a same-origin Host route and migrate browser-local metadata only after Host acknowledgement.
 
 ## 0.6.0 — 2026-08-17
 

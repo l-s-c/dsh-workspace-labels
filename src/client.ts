@@ -1,26 +1,24 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import type { IWorkspaces, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-client-runtime/client'
 import { mountDecorations } from './decorations.js'
+import { createHttpLabelsStore } from './http-store.js'
 import { mountInlineEditor, type InlineCopy } from './menu-inline.js'
 import { enhanceOpenWorkspaceMenu } from './menu-enhancer.js'
 import { mountSessionMenu } from './session-menu.js'
-import { decodeDocument, type LabelsDocument } from './state.js'
-import { createLabelsStore } from './store.js'
+
 
 type ClientContext = Context & {
   workspaces: IWorkspaces
   connection: ConnectionHandle
   locale: LocaleRuntime
-  settingsScope: SettingsScopeBinder
   sessions: { list: { getSnapshot(): { byId: Record<string, { displayTitle: string }> }; subscribe(listener: () => void): () => void } }
 }
 
 const LOCALE_NS = 'workspace-labels'
 export const name = 'workspace-labels'
-export const inject = ['workspaces', 'sessions', 'connection', 'locale', 'settingsScope']
+export const inject = ['workspaces', 'sessions', 'connection', 'locale']
 
 export function apply(ctx: ClientContext): void {
   const unregisterLocale = ctx.locale.register(LOCALE_NS, 'zh', {
@@ -30,8 +28,7 @@ export function apply(ctx: ClientContext): void {
     openWorkspace: 'Open workspace', copyWorkspacePath: 'Copy workspace path', color: 'Color', labels: 'Labels', addLabel: 'Add label', labelPlaceholder: 'New label name', clear: 'Clear', delete: 'Delete label',
   })
   const t = ctx.locale.bind(LOCALE_NS)
-  const scope = ctx.settingsScope.bind<LabelsDocument>({ namespace: 'workspace-labels', decode: decodeDocument }) as SettingsScope<LabelsDocument>
-  const store = createLabelsStore(scope, window.localStorage)
+  const store = createHttpLabelsStore(window.localStorage)
   const copy = (): InlineCopy => ({ color: t('color'), labels: t('labels'), addLabel: t('addLabel'), labelPlaceholder: t('labelPlaceholder'), clear: t('clear'), delete: t('delete') })
 
   ctx.effect(() => {

@@ -11,8 +11,8 @@
 - 在工作区和会话原有三点菜单内直接选择 8 种颜色或清除颜色。
 - 在同一菜单内勾选、新建、删除标签，不使用独立弹窗。
 - 标签显示在名称右侧、时间与操作按钮左侧。
-- 本地 GUI 持久化到 `~/.dsh/settings.yaml`；首次加载自动迁移旧浏览器数据。
-- 远程或只读设置环境回退到浏览器 `localStorage`。
+- 本地 GUI 持久化到 `~/.dsh/workspace-labels.json`；首次加载自动迁移旧浏览器数据。
+- Host 路由不可用时保留浏览器 `localStorage` 副本。
 - 中英文界面随 DSH 语言切换。
 - 不读取会话正文，不修改项目文件，不访问第三方网络。
 
@@ -42,18 +42,12 @@ dsh plugin --profile web add \
 本地 GUI 的元数据保存在：
 
 ```text
-~/.dsh/settings.yaml
+~/.dsh/workspace-labels.json
 ```
 
-对应 YAML 分节：
+存储内容包括工作区/会话颜色、标签定义和标签分配关系。插件升级后会将 `localStorage` 键 `dsh.workspaceLabels.v1` 的旧数据迁移到 Host；只有 Host 成功落盘并回传确认后才删除浏览器副本。
 
-```yaml
-workspace-labels:
-```
-
-存储内容包括工作区/会话颜色、标签定义和标签分配关系。插件更新到支持 Host 持久化的版本后，会将 `localStorage` 键 `dsh.workspaceLabels.v1` 的旧数据迁移到 Host；只有 Host 回传确认后的数据才会删除浏览器副本。
-
-- 设置服务不可写或使用远程浏览器时，继续回退到浏览器 `localStorage`。
+DSH `0.1.0-rc.6` 的 Web Settings API 使用内置命名空间白名单，第三方插件无法自行暴露新 namespace，因此插件使用自己的同源 Host 路由持久化，而不是写入 `settings.yaml`。Host 路由不可用时继续保留浏览器副本。
 - “打开工作区”只在 Loopback Host 声明 `canOpenPath` 时显示。
 - “复制工作区路径”使用浏览器 Clipboard API。
 - 插件调用 DSH 同源 Client→Host API，不向第三方服务发送请求。
