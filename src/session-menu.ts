@@ -1,5 +1,5 @@
 import type { LabelsStore } from './store.js'
-import { nextColor } from './state.js'
+import { titleText } from './decorations.js'
 
 export interface SessionEntity { id: string; title: string }
 
@@ -7,7 +7,9 @@ export interface SessionMenuOptions {
   document: Document
   store: LabelsStore
   sessions(): readonly SessionEntity[]
-  labels: { color: string; manage: string; prompt: string }
+  labels: { color: string; manage: string }
+  onEditColor(session: SessionEntity): void
+  onEditLabels(session: SessionEntity): void
 }
 
 function classContains(element: Element, value: string): boolean {
@@ -15,8 +17,8 @@ function classContains(element: Element, value: string): boolean {
 }
 
 function titleOf(row: HTMLElement): string {
-  const title = Array.from(row.children).find((child) => classContains(child, 'title'))
-  return title?.textContent?.trim() ?? ''
+  const title = Array.from(row.children).find((child): child is HTMLElement => child instanceof HTMLElement && classContains(child, 'title'))
+  return title === undefined ? '' : titleText(title)
 }
 
 function menuItem(document: Document, menu: HTMLElement, action: string, label: string, select: () => void): HTMLElement {
@@ -40,7 +42,7 @@ function menuItem(document: Document, menu: HTMLElement, action: string, label: 
 }
 
 export function mountSessionMenu(options: SessionMenuOptions): () => void {
-  const { document, store } = options
+  const { document } = options
   let disposed = false
   let pending = false
   const sync = (): void => {
@@ -65,27 +67,12 @@ export function mountSessionMenu(options: SessionMenuOptions): () => void {
     const viewport = menu.querySelector<HTMLElement>('[role="presentation"]') ?? menu
     const close = (): void => { document.dispatchEvent(new (document.defaultView?.MouseEvent ?? MouseEvent)('pointerdown', { bubbles: true })) }
     const color = menuItem(document, menu, 'workspace-labels-session-color', options.labels.color, () => {
-      const state = store.getSnapshot(); const colors = { ...state.sessionColors }; const value = nextColor(colors[session.id])
-      if (value === undefined) delete colors[session.id]; else colors[session.id] = value
-      void store.patch({ sessionColors: colors }); close()
+      close()
+      options.onEditColor(session)
     })
     const labels = menuItem(document, menu, 'workspace-labels-session-labels', options.labels.manage, () => {
-      const state = store.getSnapshot()
-      const existing = (state.sessionLabels[session.id] ?? []).map((id) => state.labels.find((label) => label.id === id)?.name).filter(Boolean).join(', ')
-      const input = window.prompt(options.labels.prompt, existing)
-      if (input !== null) {
-        const names = [...new Set(input.split(',').map((name) => name.trim()).filter(Boolean))].slice(0, 8)
-        const definitions = [...state.labels]
-        const ids = names.map((name) => {
-          const found = definitions.find((item) => item.name.toLowerCase() === name.toLowerCase())
-          if (found !== undefined) return found.id
-          const id = `label-${Date.now()}-${definitions.length}`
-          definitions.push({ id, name: name.slice(0, 24), color: nextColor(definitions.at(-1)?.color) ?? '#3b82f6' })
-          return id
-        })
-        void store.patch({ labels: definitions, sessionLabels: { ...state.sessionLabels, [session.id]: ids } })
-      }
       close()
+      options.onEditLabels(session)
     })
     viewport.prepend(color, labels)
   }

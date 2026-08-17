@@ -3,7 +3,8 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { IWorkspaces, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { mountDecorations, nextColor } from './decorations.js'
+import { mountDecorations } from './decorations.js'
+import { openColorEditor, openLabelEditor, type EditorCopy } from './editor-ui.js'
 import { mountFilterUi } from './filter-ui.js'
 import { enhanceOpenWorkspaceMenu } from './menu-enhancer.js'
 import { mountSessionMenu } from './session-menu.js'
@@ -25,14 +26,18 @@ export const inject = ['workspaces', 'sessions', 'connection', 'locale', 'settin
 
 export function apply(ctx: ClientContext): void {
   const unregisterLocale = ctx.locale.register(LOCALE_NS, 'zh', {
-    openWorkspace: '打开工作区', copyWorkspacePath: '复制工作区路径', cycleColor: '切换工作区颜色', manageLabels: '管理工作区标签', promptLabels: '输入标签，使用英文逗号分隔', filterPlaceholder: '筛选：文字或 #标签', saveView: '保存视图', viewName: '视图名称', allViews: '全部', sessionColor: '切换会话颜色', sessionLabels: '管理会话标签',
+    openWorkspace: '打开工作区', copyWorkspacePath: '复制工作区路径', cycleColor: '设置工作区颜色', manageLabels: '管理工作区标签', filterPlaceholder: '筛选：文字或 #标签', saveView: '保存视图', viewName: '视图名称', allViews: '全部', sessionColor: '设置会话颜色', sessionLabels: '管理会话标签', colorTitle: '选择颜色', labelTitle: '管理标签', newLabel: '新建标签', labelName: '标签名称', clear: '清除颜色', cancel: '取消', save: '保存', delete: '删除标签',
   })
   const unregisterEnglish = ctx.locale.register(LOCALE_NS, 'en', {
-    openWorkspace: 'Open workspace', copyWorkspacePath: 'Copy workspace path', cycleColor: 'Cycle workspace color', manageLabels: 'Manage workspace labels', promptLabels: 'Enter labels separated by commas', filterPlaceholder: 'Filter: text or #label', saveView: 'Save view', viewName: 'View name', allViews: 'All', sessionColor: 'Cycle session color', sessionLabels: 'Manage session labels',
+    openWorkspace: 'Open workspace', copyWorkspacePath: 'Copy workspace path', cycleColor: 'Set workspace color', manageLabels: 'Manage workspace labels', filterPlaceholder: 'Filter: text or #label', saveView: 'Save view', viewName: 'View name', allViews: 'All', sessionColor: 'Set session color', sessionLabels: 'Manage session labels', colorTitle: 'Choose color', labelTitle: 'Manage labels', newLabel: 'New label', labelName: 'Label name', clear: 'Clear color', cancel: 'Cancel', save: 'Save', delete: 'Delete label',
   })
   const t = ctx.locale.bind(LOCALE_NS)
   const scope = ctx.settingsScope.bind<LabelsDocument>({ namespace: 'workspace-labels', decode: decodeDocument }) as SettingsScope<LabelsDocument>
   const store = createLabelsStore(scope, window.localStorage)
+  const editorCopy = (): EditorCopy => ({
+    colorTitle: t('colorTitle'), labelTitle: t('labelTitle'), newLabel: t('newLabel'), labelName: t('labelName'),
+    clear: t('clear'), cancel: t('cancel'), save: t('save'), delete: t('delete'),
+  })
 
   ctx.effect(() => {
     const workspaceEntities = () => ctx.workspaces.list.getSnapshot().items.map((item) => ({ id: item.workspaceId, title: item.title }))
@@ -53,11 +58,37 @@ export function apply(ctx: ClientContext): void {
       ],
       labels: { placeholder: t('filterPlaceholder'), saveView: t('saveView'), viewName: t('viewName'), all: t('allViews') },
     })
+    const editColor = (target: 'workspace' | 'session', id: string, title: string): void => {
+      const state = store.getSnapshot()
+      const colors = target === 'workspace' ? state.workspaceColors : state.sessionColors
+      openColorEditor({
+        document, title, current: colors[id], copy: editorCopy(),
+        onSave: async (color) => {
+          const next = { ...colors }
+          if (color === undefined) delete next[id]; else next[id] = color
+          await store.patch(target === 'workspace' ? { workspaceColors: next } : { sessionColors: next })
+        },
+      })
+    }
+    const editLabels = (target: 'workspace' | 'session', id: string, title: string): void => {
+      const state = store.getSnapshot()
+      const assignments = target === 'workspace' ? state.workspaceLabels : state.sessionLabels
+      openLabelEditor({
+        document, title, labels: state.labels, selected: assignments[id] ?? [], copy: editorCopy(),
+        onSave: async (labels, selected) => {
+          const next = { ...assignments }
+          if (selected.length === 0) delete next[id]; else next[id] = selected
+          await store.patch(target === 'workspace' ? { labels, workspaceLabels: next } : { labels, sessionLabels: next })
+        },
+      })
+    }
     const disposeSessionMenu = mountSessionMenu({
       document,
       store,
       sessions: sessionEntities,
-      labels: { color: t('sessionColor'), manage: t('sessionLabels'), prompt: t('promptLabels') },
+      labels: { color: t('sessionColor'), manage: t('sessionLabels') },
+      onEditColor: (session) => editColor('session', session.id, session.title),
+      onEditLabels: (session) => editLabels('session', session.id, session.title),
     })
 
     const mount = (): (() => void) => enhanceOpenWorkspaceMenu({
@@ -72,30 +103,8 @@ export function apply(ctx: ClientContext): void {
         getSnapshot: () => ctx.connection.isLoopback && ctx.connection.hostDescription.getSnapshot()?.canOpenPath === true,
         subscribe: (listener) => ctx.connection.hostDescription.subscribe(listener),
       },
-      onCycleColor: async (workspace) => {
-        const current = store.getSnapshot().workspaceColors
-        const color = nextColor(current[workspace.workspaceId])
-        const workspaceColors = { ...current }
-        if (color === undefined) delete workspaceColors[workspace.workspaceId]
-        else workspaceColors[workspace.workspaceId] = color
-        await store.patch({ workspaceColors })
-      },
-      onManageLabels: async (workspace) => {
-        const state = store.getSnapshot()
-        const existing = (state.workspaceLabels[workspace.workspaceId] ?? []).map((id) => state.labels.find((label) => label.id === id)?.name).filter(Boolean).join(', ')
-        const input = window.prompt(t('promptLabels'), existing)
-        if (input === null) return
-        const names = [...new Set(input.split(',').map((name) => name.trim()).filter(Boolean))].slice(0, 8)
-        const labels = [...state.labels]
-        const ids = names.map((name) => {
-          const found = labels.find((label) => label.name.toLowerCase() === name.toLowerCase())
-          if (found !== undefined) return found.id
-          const id = `label-${Date.now()}-${labels.length}`
-          labels.push({ id, name: name.slice(0, 24), color: nextColor(labels.at(-1)?.color) ?? '#3b82f6' })
-          return id
-        })
-        await store.patch({ labels, workspaceLabels: { ...state.workspaceLabels, [workspace.workspaceId]: ids } })
-      },
+      onCycleColor: (workspace) => editColor('workspace', workspace.workspaceId, workspace.title),
+      onManageLabels: (workspace) => editLabels('workspace', workspace.workspaceId, workspace.title),
       logger: ctx.logger,
       label: t('openWorkspace'), copyLabel: t('copyWorkspacePath'), colorLabel: t('cycleColor'), labelsLabel: t('manageLabels'),
     })

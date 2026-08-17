@@ -25,6 +25,15 @@ function childByClass(row: Element, part: string): HTMLElement | undefined {
   )
 }
 
+export function titleText(element: Element): string {
+  let text = ''
+  for (const node of Array.from(element.childNodes)) {
+    if (node.nodeType === 1 && (node as Element).classList.contains(BADGE_CLASS)) continue
+    text += node.textContent ?? ''
+  }
+  return text.trim()
+}
+
 function rgba(hex: string, alpha: number): string {
   const match = /^#([0-9a-f]{6})$/i.exec(hex)
   if (match === null) return 'transparent'
@@ -33,7 +42,8 @@ function rgba(hex: string, alpha: number): string {
 }
 
 function resolveByTitle(row: HTMLElement, entities: readonly RowEntity[], marker: string, titlePart: string): RowEntity | undefined {
-  const title = childByClass(row, titlePart)?.textContent?.trim() ?? ''
+  const titleElement = childByClass(row, titlePart)
+  const title = titleElement === undefined ? '' : titleText(titleElement)
   const knownId = row.getAttribute(marker)
   if (knownId !== null) {
     const known = entities.find((item) => item.id === knownId)
@@ -52,20 +62,28 @@ function labelsFor(document: LabelsDocument, ids: readonly string[]): { name: st
 }
 
 function decorate(row: HTMLElement, entity: RowEntity, titleElement: HTMLElement, color: string | undefined, labels: { name: string; color: string }[]): void {
-  row.style.removeProperty('--dsh-workspace-label-color')
-  row.style.removeProperty('--dsh-workspace-label-tint')
-  row.classList.remove('dsh-workspace-labels-colored')
-  if (color !== undefined) {
+  if (color === undefined) {
+    if (row.classList.contains('dsh-workspace-labels-colored')) {
+      row.style.removeProperty('--dsh-workspace-label-color')
+      row.style.removeProperty('--dsh-workspace-label-tint')
+      row.classList.remove('dsh-workspace-labels-colored')
+    }
+  } else if (row.style.getPropertyValue('--dsh-workspace-label-color') !== color || !row.classList.contains('dsh-workspace-labels-colored')) {
     row.style.setProperty('--dsh-workspace-label-color', color)
     row.style.setProperty('--dsh-workspace-label-tint', rgba(color, 0.1))
     row.classList.add('dsh-workspace-labels-colored')
   }
-  titleElement.querySelector(`.${BADGE_CLASS}`)?.remove()
-  if (labels.length === 0) return
+  const existing = titleElement.querySelector<HTMLElement>(`.${BADGE_CLASS}`)
+  const shown = labels.slice(0, 3)
+  const signature = shown.map((label) => `${label.name}\u0000${label.color}`).join('\u0001')
+  if (existing !== null && existing.dataset.signature === signature && existing.dataset.entityId === entity.id) return
+  existing?.remove()
+  if (shown.length === 0) return
   const badges = row.ownerDocument.createElement('span')
   badges.className = BADGE_CLASS
   badges.dataset.entityId = entity.id
-  for (const label of labels.slice(0, 3)) {
+  badges.dataset.signature = signature
+  for (const label of shown) {
     const badge = row.ownerDocument.createElement('span')
     badge.className = 'dsh-workspace-labels-badge'
     badge.textContent = label.name
@@ -112,6 +130,7 @@ export function mountDecorations(options: DecorationOptions): () => void {
       if (entity === undefined) continue
       decorate(row, entity, title, state.sessionColors[entity.id], labelsFor(state, state.sessionLabels[entity.id] ?? []))
     }
+    observer.takeRecords()
   }
   const schedule = (): void => {
     if (pending || disposed) return

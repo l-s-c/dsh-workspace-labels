@@ -1,3 +1,4 @@
+import { titleText } from './decorations.js'
 import { activeQuery, matchesFilter, saveView, type FilterEntity } from './filter.js'
 import type { LabelsStore } from './store.js'
 
@@ -12,7 +13,7 @@ export interface FilterUiOptions {
 
 function titleOf(row: HTMLElement): string {
   const candidates = Array.from(row.querySelectorAll<HTMLElement>('span'))
-  return candidates.map((item) => item.textContent?.trim() ?? '').find((text) => text !== '') ?? ''
+  return candidates.map((item) => titleText(item)).find((text) => text !== '') ?? ''
 }
 
 export function mountFilterUi(options: FilterUiOptions): () => void {
@@ -42,23 +43,30 @@ export function mountFilterUi(options: FilterUiOptions): () => void {
     while (parent !== null && parent.querySelectorAll('[role="treeitem"]').length < 2) parent = parent.parentElement
     return parent ?? undefined
   }
+  let viewsSignature: string | undefined
   const renderViews = (): void => {
     const state = store.getSnapshot()
-    select.textContent = ''
-    const all = document.createElement('option')
-    all.value = ''
-    all.textContent = options.labels.all
-    select.appendChild(all)
-    for (const view of state.views) {
-      const option = document.createElement('option')
-      option.value = view.id
-      option.textContent = view.name
-      select.appendChild(option)
+    const signature = JSON.stringify(state.views.map((view) => [view.id, view.name]))
+    if (signature !== viewsSignature) {
+      viewsSignature = signature
+      select.textContent = ''
+      const all = document.createElement('option')
+      all.value = ''
+      all.textContent = options.labels.all
+      select.appendChild(all)
+      for (const view of state.views) {
+        const option = document.createElement('option')
+        option.value = view.id
+        option.textContent = view.name
+        select.appendChild(option)
+      }
     }
-    select.value = state.activeViewId
-    input.value = activeQuery(state)
+    if (select.value !== state.activeViewId) select.value = state.activeViewId
+    const query = activeQuery(state)
+    if (document.activeElement !== input && input.value !== query) input.value = query
   }
   const apply = (): void => {
+    pending = false
     if (disposed) return
     const host = locate()
     if (host !== undefined && !bar.isConnected) host.prepend(bar)
@@ -72,6 +80,13 @@ export function mountFilterUi(options: FilterUiOptions): () => void {
       if (query === '' || matches.length !== 1) row.style.removeProperty('display')
       else row.style.display = matchesFilter(matches[0], state, query) ? '' : 'none'
     }
+    observer.takeRecords()
+  }
+  let pending = false
+  const schedule = (): void => {
+    if (pending || disposed) return
+    pending = true
+    queueMicrotask(apply)
   }
   input.addEventListener('input', () => { void store.patch({ filterQuery: input.value, activeViewId: '' }) })
   select.addEventListener('change', () => { void store.patch({ activeViewId: select.value }) })
@@ -84,10 +99,10 @@ export function mountFilterUi(options: FilterUiOptions): () => void {
   })
   const Observer = document.defaultView?.MutationObserver
   if (Observer === undefined) throw new Error('dsh-workspace-labels: MutationObserver unavailable')
-  const observer = new Observer(apply)
+  const observer = new Observer(schedule)
   observer.observe(document.body, { childList: true, subtree: true })
-  const unsubscribe = store.subscribe(apply)
-  apply()
+  const unsubscribe = store.subscribe(schedule)
+  schedule()
   return () => {
     disposed = true
     observer.disconnect()

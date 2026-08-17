@@ -1,3 +1,5 @@
+import { titleText } from './decorations.js'
+
 export const PLUGIN_ID = 'dsh-workspace-labels'
 export const OPEN_ACTION = 'workspace-labels-open'
 export const COPY_ACTION = 'workspace-labels-copy-path'
@@ -56,8 +58,8 @@ function workspaceRows(document: Document): HTMLElement[] {
 }
 
 function rowTitle(row: HTMLElement): string {
-  const title = directChildByClassPart(row, 'projectText')?.textContent
-  return title?.trim() ?? ''
+  const title = directChildByClassPart(row, 'projectText')
+  return title === undefined ? '' : titleText(title)
 }
 
 function menuButton(row: HTMLElement): HTMLButtonElement | undefined {
